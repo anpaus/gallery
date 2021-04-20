@@ -15,7 +15,7 @@ import 'package:provider/provider.dart';
 
 const appBarDesktopHeight = 128.0;
 Future<Album> futureAlbum;
-int selectedItem = 0;
+int selectedItem = 1;
 
 Future<Album> fetchAlbum(String i) async {
   final String s = 'jsonplaceholder.typicode.com';
@@ -301,7 +301,7 @@ class _ListDrawerState extends State<ListDrawer> {
                 selected: i == selectedItem,
                 leading: const Icon(Icons.favorite),
                 title: FutureBuilder<Album>(
-                  future: futureAlbum,
+                  future: fetchAlbum(i.toString()),
                   builder: (context, snapshot) {
                     if (snapshot.hasData) {
                       return Text(snapshot.data.title);
@@ -342,6 +342,7 @@ class _BodyDynamicState extends State<BodyDynamic> {
   @override
   void initState() {
     super.initState();
+    futureAlbum = fetchAlbum(selectedItem.toString());
   }
 
 
@@ -359,17 +360,32 @@ class _BodyDynamicState extends State<BodyDynamic> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              /*GalleryLocalizations.of(context).starterAppGenericHeadline*/ selectedItem.toString(),
-              style: textTheme.headline3.copyWith(
-                color: colorScheme.onSecondary,
-              ),
+            FutureBuilder<Album>(
+              future: futureAlbum,
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return Text(snapshot.data.id.toString());
+                } else if (snapshot.hasError) {
+                  return Text("${snapshot.error}");
+                }
 
+                // By default, show a loading spinner.
+                return Text("Loading...");
+              },
             ),
             const SizedBox(height: 10),
-            Text(
-              GalleryLocalizations.of(context).starterAppGenericSubtitle,
-              style: textTheme.subtitle1,
+            FutureBuilder<Album>(
+              future: futureAlbum,
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return Text(snapshot.data.userId.toString());
+                } else if (snapshot.hasError) {
+                  return Text("${snapshot.error}");
+                }
+
+                // By default, show a loading spinner.
+                return Text("Loading...");
+              },
             ),
             const SizedBox(height: 48),
             FutureBuilder<Album>(
