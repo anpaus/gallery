@@ -13,6 +13,8 @@ import 'package:gallery/layout/text_scale.dart';
 import 'package:gallery/studies/rally/app.dart';
 import 'package:gallery/studies/rally/colors.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
+
 class LoginPage extends StatefulWidget {
   const LoginPage();
 
@@ -25,6 +27,7 @@ class _LoginPageState extends State<LoginPage> with RestorationMixin {
       RestorableTextEditingController();
   final RestorableTextEditingController _passwordController =
       RestorableTextEditingController();
+
 
   @override
   String get restorationId => 'login_page';
@@ -68,8 +71,31 @@ class _MainView extends StatelessWidget {
   final TextEditingController usernameController;
   final TextEditingController passwordController;
 
-  void _login(BuildContext context) {
-    Navigator.of(context).restorablePushNamed(RallyApp.homeRoute);
+  Future<UserCredential> signInWithGoogle() async {
+    // Create a new provider
+    GoogleAuthProvider googleProvider = GoogleAuthProvider();
+
+    googleProvider.addScope('https://www.googleapis.com/auth/contacts.readonly');
+    googleProvider.setCustomParameters({
+      'login_hint': 'user@example.com'
+    });
+
+    // Once signed in, return the UserCredential
+    return await FirebaseAuth.instance.signInWithPopup(googleProvider);
+
+    // Or use signInWithRedirect
+    // return await FirebaseAuth.instance.signInWithRedirect(googleProvider);
+  }
+
+
+  void _login(BuildContext context) async {
+    try {
+      var g = await signInWithGoogle();
+      Navigator.of(context).restorablePushNamed(RallyApp.homeRoute);
+    }
+    catch (e) {
+      print('Login Error');
+    }
   }
 
   @override

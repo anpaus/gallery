@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  firebase_core: "^1.0.4"
+  firebase_auth: "^1.1.1"
   flutter_localizations:
     sdk: flutter
   adaptive_breakpoints: ^0.0.4
