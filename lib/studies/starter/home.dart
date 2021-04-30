@@ -4,6 +4,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:firebase_core/firebase_core.dart' as firebase_core;
+import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 
 import 'package:flutter_gen/gen_l10n/gallery_localizations.dart';
 import 'package:gallery/layout/adaptive.dart';
@@ -13,13 +15,68 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import 'package:mime_type/mime_type.dart';
+import 'package:image_picker_web_redux/image_picker_web_redux.dart';
+import 'package:path/path.dart' as Path;
+
+import 'package:gallery/ml.dart';
+import 'package:js/js_util.dart' as jsutil;
+import 'dart:html' as html;
+
 const appBarDesktopHeight = 128.0;
 Future<Album> futureAlbum;
 int selectedItem = 1;
+Image fromPicker;
+MediaInfo mediaData;
+final _listOfMap = <ImageResults>[];
+String p = '';
+
+Future selectImage() async {
+  //fromPicker = await ImagePickerWeb.getImage(outputType: ImageType.widget);
+  mediaData = await ImagePickerWeb.getImageInfo;
+  print(mediaData.fileName);
+  fromPicker = Image.memory(mediaData.data);
+
+  firebase_storage.FirebaseStorage storage =
+      firebase_storage.FirebaseStorage.instance;
+
+  String mimeType = mime(Path.basename(mediaData.fileName));
+  //html.File mediaFile = new html.File(mediaData.data, mediaData.fileName, {'type': mimeType});
+  try {
+    firebase_storage.SettableMetadata metadata =
+    firebase_storage.SettableMetadata(
+      contentType: 'image/jpeg'
+    );
+    await firebase_storage.FirebaseStorage.instance
+        .ref(mediaData.fileName)
+        .putData(mediaData.data, metadata);
+    String downloadURL = await firebase_storage.FirebaseStorage.instance
+        .ref(mediaData.fileName)
+        .getDownloadURL();
+    print(downloadURL);
+
+    myFunction();
+
+    html.document.getElementById("img").setAttribute('src', downloadURL);
+    Image image = Image.memory(mediaData.data);
+    image.image
+        .resolve(ImageConfiguration())
+        .addListener(ImageStreamListener((ImageInfo info, bool isSync) {
+      html.document.getElementById("img").setAttribute('width', info.image.width.toString());
+      html.document.getElementById("img").setAttribute('height', info.image.height.toString());
+      print(info.image.width);
+      print(info.image.height);
+    }));
+
+  } on firebase_core.FirebaseException catch (e) {
+    print(e);
+  }
+
+}
 
 Future<Album> fetchAlbum(String i) async {
-  final String s = 'jsonplaceholder.typicode.com';
-  final String a = 'albums/' + i;
+  final String s = 'reqres.in';
+  final String a = 'api/users/' + i;
   final response = await http.get(Uri.https(s,a));
 
   if (response.statusCode == 200) {
@@ -36,6 +93,7 @@ Future<Album> fetchAlbum(String i) async {
 
 class AlbumModel extends ChangeNotifier {
   void refresh() {
+    print("Listeners Notified");
     notifyListeners();
   }
 }
@@ -43,16 +101,16 @@ class AlbumModel extends ChangeNotifier {
 
 class Album {
   final int userId;
-  final int id;
+  final String id;
   final String title;
 
   Album({@required this.userId, @required this.id, @required this.title});
 
   factory Album.fromJson(Map<String, dynamic> json) {
     return Album(
-      userId: json['userId'],
-      id: json['id'],
-      title: json['title'],
+      userId: json['data']['id'],
+      id: json['data']['email'],
+      title: json['data']['first_name'],
     );
   }
 
@@ -136,25 +194,40 @@ class HomePage extends StatelessWidget {
                 }),
             const VerticalDivider(width: 1),
             Expanded(
-              child: Scaffold(
-                appBar: const AdaptiveAppBar(
+              child:
+              Consumer<AlbumModel>(
+              builder: (context, cart, child) {
+                return Scaffold(
+                appBar:
+                  const AdaptiveAppBar(
                   isDesktop: true,
-                ),
-                body: Consumer<AlbumModel>(
-                  builder: (context, cart, child) {
-                    return BodyDynamic();
-                  }),
-                floatingActionButton: FloatingActionButton.extended(
-                  heroTag: 'Extended Add',
-                  onPressed: () {},
-                  label: Text(
-                    GalleryLocalizations.of(context).starterAppGenericButton,
-                    style: TextStyle(color: colorScheme.onSecondary),
                   ),
-                  icon: Icon(Icons.add, color: colorScheme.onSecondary),
-                  tooltip: GalleryLocalizations.of(context).starterAppTooltipAdd,
-                ),
-              ),
+
+                   body: Consumer<AlbumModel>(
+                    builder: (context, cart, child) {
+                    print('Rebuilding Body Dynamic');
+                    return BodyDynamic();
+                    }),
+                floatingActionButton:
+                  Consumer<AlbumModel>(
+                  builder: (context, cart, child) {
+                    return FloatingActionButton.extended(
+                    heroTag: 'Extended Add',
+                    onPressed: () async {
+                    await selectImage();
+                    var cart = context.read<AlbumModel>();
+                    cart.refresh();
+                    },
+                      label: Text(
+                        GalleryLocalizations.of(context).starterAppGenericButton,
+                        style: TextStyle(color: colorScheme.onSecondary),
+                        ),
+                      icon: Icon(Icons.add, color: colorScheme.onSecondary),
+                      tooltip: GalleryLocalizations.of(context).starterAppTooltipAdd,
+                      );
+                }),
+                );
+                })
             ),
           ],
         ),
@@ -238,15 +311,52 @@ class AdaptiveAppBar extends StatelessWidget implements PreferredSizeWidget {
             )
           : null,
       actions: [
-        IconButton(
+        Consumer<AlbumModel>(
+            builder: (context, cart, child) {
+          return IconButton(
           icon: const Icon(Icons.share),
           tooltip: GalleryLocalizations.of(context).starterAppTooltipShare,
-          onPressed: () {},
-        ),
+          onPressed: () async {
+            //var a = 'https://i.imgur.com/jbWVY0v.png';
+            //var a = 'https://firebasestorage.googleapis.com/v0/b/anpaus-dart.appspot.com/o/Malbork.JPG?alt=media&token=f9b960d4-98f5-4a9e-a99b-9777d347a26d';
+            print(html.document.getElementById("img").getAttribute('src'));
+            print(html.document.getElementById("img").getAttribute('width'));
+            print(html.document.getElementById("img").getAttribute('height'));
+            List<Object> _val = await jsutil.promiseToFuture<List<Object>>(imageClassifier());
+            //final _listOfMap = <ImageResults>[];
+
+            _listOfMap.clear();
+            p = '';
+
+            for (final item in _val) {
+              final _jsString = stringify(item);
+              _listOfMap.add(jsonObject(_jsString));
+            }
+
+            for (final ImageResults _item in _listOfMap) {
+              print('ClassName : ${_item.className}');
+              print('Probability : ${_item.probability}\n');
+              p += 'ClassName : ${_item.className} ';
+              p += 'Probability : ${_item.probability} ';
+            }
+
+            print(p);
+
+            var cart = context.read<AlbumModel>();
+            cart.refresh();
+          },
+        );
+        }),
+
         IconButton(
           icon: const Icon(Icons.favorite),
           tooltip: GalleryLocalizations.of(context).starterAppTooltipFavorite,
-          onPressed: () {},
+          onPressed: () async {
+            log('Hello world!'); // invokes console.log() in JavaScript land
+            myFunction();
+            num x = await jsutil.promiseToFuture<num>(runPrediction());
+            print('Prediction: ' + x.toString());
+          },
         ),
         IconButton(
           icon: const Icon(Icons.search),
@@ -301,7 +411,7 @@ class _ListDrawerState extends State<ListDrawer> {
                 selected: i == selectedItem,
                 leading: const Icon(Icons.favorite),
                 title: FutureBuilder<Album>(
-                  future: fetchAlbum(i.toString()),
+                  future: fetchAlbum((i+1).toString()),
                   builder: (context, snapshot) {
                     if (snapshot.hasData) {
                       return Text(snapshot.data.title);
@@ -316,7 +426,7 @@ class _ListDrawerState extends State<ListDrawer> {
                 onTap: () {
                   setState(() {
                     selectedItem = i;
-                    futureAlbum = fetchAlbum(selectedItem.toString());
+                    futureAlbum = fetchAlbum((selectedItem+1).toString());
                     var cart = context.read<AlbumModel>();
                     cart.refresh();
                   });
@@ -342,10 +452,8 @@ class _BodyDynamicState extends State<BodyDynamic> {
   @override
   void initState() {
     super.initState();
-    futureAlbum = fetchAlbum(selectedItem.toString());
+    futureAlbum = fetchAlbum((selectedItem+1).toString());
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +461,8 @@ class _BodyDynamicState extends State<BodyDynamic> {
     final colorScheme = Theme.of(context).colorScheme;
     final isDesktop = isDisplayDesktop(context);
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
+        child: Padding(
         padding: isDesktop
             ? const EdgeInsets.symmetric(horizontal: 72, vertical: 48)
             : const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -401,10 +510,54 @@ class _BodyDynamicState extends State<BodyDynamic> {
                 return Text("Loading...");
               },
             ),
+            Container(
+                margin: EdgeInsets.all(15),
+                padding: EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(15),
+                  ),
+                  border: Border.all(color: Colors.white),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      offset: Offset(2, 2),
+                      spreadRadius: 2,
+                      blurRadius: 1,
+                    ),
+                  ],
+                ),
+                child: (fromPicker != null)?
+                fromPicker :
+                Image.network('https://i.imgur.com/sUFH1Aq.png')
+            ),
+            const SizedBox(),
+            Container(
+                margin: EdgeInsets.all(15),
+                padding: EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(15),
+                  ),
+                  border: Border.all(color: Colors.white),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      offset: Offset(2, 2),
+                      spreadRadius: 2,
+                      blurRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Text(p)
+            ),
 
           ],
         ),
       ),
+      )
     );
   }
 }

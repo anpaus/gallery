@@ -19,6 +19,8 @@ export 'package:gallery/data/demos.dart' show pumpDeferredLibraries;
 // Import the firebase_core plugin
 import 'package:firebase_core/firebase_core.dart';
 
+
+
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
   runApp(GalleryApp());
@@ -53,7 +55,7 @@ class GalleryApp extends StatelessWidget {
         // Once complete, show your application
         if (snapshot.connectionState == ConnectionState.done) {
           print('Firebase - connection established');
-          return ModelBinding(
+           return ModelBinding(
             initialModel: GalleryOptions(
               themeMode: ThemeMode.system,
               textScaleFactor: systemTextScaleFactorOption,
@@ -95,6 +97,7 @@ class GalleryApp extends StatelessWidget {
         }
 
         // Otherwise, show something whilst waiting for initialization to complete
+
         print('Loading....');
         return Container();
       },

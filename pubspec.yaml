@@ -11,6 +11,10 @@ dependencies:
     sdk: flutter
   firebase_core: "^1.0.4"
   firebase_auth: "^1.1.1"
+  firebase_storage: "^8.0.5"
+  image_picker_web_redux: any
+  js: any
+  mime_type: ^1.0.0
   flutter_localizations:
     sdk: flutter
   adaptive_breakpoints: ^0.0.4
@@ -95,6 +99,7 @@ flutter:
         - packages/flutter_gallery_assets/fonts/google_fonts/Raleway-Light.ttf
 
   assets:
+    - web/ml.js
     - packages/flutter_gallery_assets/assets/studies/shrine_card_dark.png
     - packages/flutter_gallery_assets/assets/studies/starter_card.png
     - packages/flutter_gallery_assets/assets/studies/starter_card_dark.png
